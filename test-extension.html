@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeetSolveAI Extension Test</title>
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #3F51B5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #303F9F;
+        }
+        .btn-orange {
+            background: #FF9800;
+        }
+        .btn-orange:hover {
+            background: #F57C00;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #E8F5E8;
+            color: #2E7D32;
+        }
+        .status.error {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+        .status.info {
+            background: #E3F2FD;
+            color: #1565C0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🧠 LeetSolveAI Extension Test Page</h1>
+        <p>Use this page to test if your Chrome extension is working properly.</p>
+    </div>
+
+    <div class="card">
+        <h2>🔧 Extension Status</h2>
+        <div id="extensionStatus" class="status info">
+            Checking extension status...
+        </div>
+        
+        <h3>Quick Tests:</h3>
+        <button class="btn" onclick="testExtensionLoaded()">Test Extension Loaded</button>
+        <button class="btn btn-orange" onclick="testContentScript()">Test Content Script</button>
+        <button class="btn" onclick="testManualTrigger()">Manual Trigger</button>
+        <button class="btn btn-orange" onclick="simulateLeetCode()">Simulate LeetCode URL</button>
+    </div>
+
+    <div class="card">
+        <h2>📋 Debug Console</h2>
+        <div id="debugConsole" style="background: #000; color: #0f0; padding: 15px; border-radius: 6px; font-family: monospace; min-height: 200px; overflow-y: auto;">
+            Debug messages will appear here...<br>
+        </div>
+        <button class="btn" onclick="clearDebug()">Clear Console</button>
+    </div>
+
+    <div class="card">
+        <h2>🎯 LeetCode Problem Simulation</h2>
+        <p>Click the button below to simulate being on a LeetCode problem page:</p>
+        <button class="btn btn-orange" onclick="goToLeetCode()">Go to LeetCode Two Sum</button>
+        <button class="btn" onclick="goToLeetCodeList()">Go to LeetCode Problem List</button>
+    </div>
+
+    <div class="card">
+        <h2>📖 Instructions</h2>
+        <ol>
+            <li><strong>Load the extension</strong> in Chrome (chrome://extensions/)</li>
+            <li><strong>Start your dev server</strong>: <code>npm run dev</code></li>
+            <li><strong>Visit a LeetCode problem</strong>: <a href="https://leetcode.com/problems/two-sum/" target="_blank">Two Sum</a></li>
+            <li><strong>Look for the floating UI</strong> in the top-right corner</li>
+            <li><strong>Check browser console</strong> for [LeetSolveAI] messages</li>
+        </ol>
+    </div>
+
+    <script>
+        let debugDiv = document.getElementById('debugConsole');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#f44336' : type === 'success' ? '#4caf50' : '#0f0';
+            debugDiv.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span><br>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            console.log(`[LeetSolveAI Test] ${message}`);
+        }
+
+        function clearDebug() {
+            debugDiv.innerHTML = 'Debug console cleared...<br>';
+        }
+
+        function testExtensionLoaded() {
+            log('Testing if Chrome extension APIs are available...');
+            
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                log('✅ Chrome extension APIs are available', 'success');
+                log(`Extension ID: ${chrome.runtime.id}`, 'info');
+                
+                // Test message passing
+                chrome.runtime.sendMessage({action: 'test'}, (response) => {
+                    if (chrome.runtime.lastError) {
+                        log(`❌ Extension communication error: ${chrome.runtime.lastError.message}`, 'error');
+                    } else {
+                        log('✅ Extension communication working', 'success');
+                    }
+                });
+            } else {
+                log('❌ Chrome extension APIs not available', 'error');
+                log('Make sure you have loaded the extension in Chrome', 'error');
+            }
+        }
+
+        function testContentScript() {
+            log('Testing content script functions...');
+            
+            if (typeof window.leetSolveAITest === 'function') {
+                log('✅ Content script test function found', 'success');
+                window.leetSolveAITest();
+                log('✅ Manual trigger executed', 'success');
+            } else {
+                log('❌ Content script test function not found', 'error');
+                log('Content script may not be loaded or working', 'error');
+            }
+        }
+
+        function testManualTrigger() {
+            log('Attempting manual trigger...');
+            
+            // Try to trigger the content script manually
+            if (typeof window.leetSolveAITest === 'function') {
+                window.leetSolveAITest();
+                log('✅ Manual trigger called', 'success');
+            } else {
+                log('❌ Manual trigger function not available', 'error');
+            }
+            
+            // Check if UI exists
+            const ui = document.getElementById('leetsolveai-container');
+            if (ui) {
+                log('✅ LeetSolveAI UI element found in DOM', 'success');
+                ui.style.display = 'block';
+                log('✅ UI visibility set to block', 'success');
+            } else {
+                log('❌ LeetSolveAI UI element not found in DOM', 'error');
+            }
+        }
+
+        function simulateLeetCode() {
+            log('Simulating LeetCode environment...');
+            
+            // Change URL to simulate LeetCode
+            history.pushState({}, '', 'https://leetcode.com/problems/two-sum/');
+            log('✅ URL changed to LeetCode problem page', 'success');
+            
+            // Add a fake problem title element
+            const titleEl = document.createElement('h1');
+            titleEl.textContent = 'Two Sum';
+            titleEl.setAttribute('data-cy', 'question-title');
+            document.body.appendChild(titleEl);
+            log('✅ Added fake problem title element', 'success');
+            
+            // Try to trigger initialization
+            setTimeout(() => {
+                if (typeof window.leetSolveAITest === 'function') {
+                    window.leetSolveAITest();
+                    log('✅ Triggered extension after simulation', 'success');
+                }
+            }, 1000);
+        }
+
+        function goToLeetCode() {
+            log('Redirecting to LeetCode Two Sum problem...');
+            window.open('https://leetcode.com/problems/two-sum/', '_blank');
+        }
+
+        function goToLeetCodeList() {
+            log('Redirecting to LeetCode problem list...');
+            window.open('https://leetcode.com/problemset/', '_blank');
+        }
+
+        // Auto-run basic tests when page loads
+        window.addEventListener('load', () => {
+            log('🚀 LeetSolveAI Extension Test Page Loaded');
+            log('Running automatic tests...');
+            
+            setTimeout(() => {
+                testExtensionLoaded();
+            }, 1000);
+            
+            setTimeout(() => {
+                testContentScript();
+            }, 2000);
+        });
+
+        // Listen for extension messages
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+            chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+                log(`📨 Received message: ${JSON.stringify(request)}`, 'info');
+                sendResponse({success: true, message: 'Test page received message'});
+            });
+        }
+
+        // Update status
+        function updateStatus() {
+            const statusEl = document.getElementById('extensionStatus');
+            
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                statusEl.className = 'status success';
+                statusEl.textContent = '✅ Extension APIs available - Extension appears to be loaded';
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Extension APIs not available - Extension may not be loaded';
+            }
+        }
+
+        // Update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        updateStatus();
+    </script>
+</body>
+</html>

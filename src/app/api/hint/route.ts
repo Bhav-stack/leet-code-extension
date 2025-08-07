@@ -1,42 +1,47 @@
-// src/api/hint.js
+import { NextRequest, NextResponse } from 'next/server';
 
-export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const { problemSlug, problemTitle, type = 'hint' } = req.body;
-
-  if (!problemSlug) {
-    return res.status(400).json({ error: 'Missing problemSlug in request body' });
-  }
-
+export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
+    const { problemSlug, problemTitle, type = 'hint' } = body;
+
+    if (!problemSlug) {
+      return NextResponse.json(
+        { error: 'Missing problemSlug in request body' },
+        { status: 400 }
+      );
+    }
+
     let result;
     if (type === 'solution') {
       result = await generateSolution(problemSlug, problemTitle);
-      res.status(200).json({ solution: result });
+      return NextResponse.json({ solution: result });
     } else {
       result = await generateHint(problemSlug, problemTitle);
-      res.status(200).json({ hint: result });
+      return NextResponse.json({ hint: result });
     }
   } catch (error) {
     console.error('Error generating response:', error);
-    res.status(500).json({ error: 'Error generating response' });
+    return NextResponse.json(
+      { error: 'Error generating response' },
+      { status: 500 }
+    );
   }
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 // Function to generate hint using AI
-async function generateHint(problemSlug, problemTitle) {
+async function generateHint(problemSlug: string, problemTitle?: string): Promise<string> {
   const hf_api_token = process.env.HF_API_TOKEN;
   
   if (!hf_api_token) {
@@ -87,7 +92,7 @@ async function generateHint(problemSlug, problemTitle) {
 }
 
 // Function to generate solution using AI
-async function generateSolution(problemSlug, problemTitle) {
+async function generateSolution(problemSlug: string, problemTitle?: string): Promise<string> {
   const hf_api_token = process.env.HF_API_TOKEN;
   
   if (!hf_api_token) {
@@ -139,8 +144,8 @@ async function generateSolution(problemSlug, problemTitle) {
 }
 
 // Fallback hint generation
-function generateFallbackHint(problemSlug, problemTitle) {
-  const commonPatterns = {
+function generateFallbackHint(problemSlug: string, problemTitle?: string): string {
+  const commonPatterns: Record<string, string> = {
     'two-sum': 'Consider using a hash map to store complements as you iterate through the array.',
     'add-two-numbers': 'Think about how you add numbers digit by digit, handling carry-over.',
     'longest-substring-without-repeating-characters': 'Use the sliding window technique with a hash set.',
@@ -177,7 +182,7 @@ function generateFallbackHint(problemSlug, problemTitle) {
 }
 
 // Fallback solution generation
-function generateFallbackSolution(problemSlug, problemTitle) {
+function generateFallbackSolution(problemSlug: string, problemTitle?: string): string {
   return `🔧 **Solution Approach for ${problemTitle}:**
 
 **Step 1: Understand the Problem**
