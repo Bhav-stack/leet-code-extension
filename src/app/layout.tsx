@@ -12,13 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet"></link>
-      </head>
-      <body className="font-body antialiased">{children}</body>
+    <html lang="en" className="font-body antialiased">
+      <link rel="preconnect" href="https://fonts.googleapis.com"/>
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin=""/>
+      <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet"/>
+      <body>{children}</body>
     </html>
   );
 }
