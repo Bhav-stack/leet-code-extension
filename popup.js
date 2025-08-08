@@ -54,13 +54,17 @@ document.addEventListener('DOMContentLoaded', () => {
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
+        console.log('Hint - Current tab URL:', currentTab?.url);
         if (currentTab && currentTab.url && currentTab.url.includes('leetcode.com/problems/')) {
+          console.log('Sending hint request to tab:', currentTab.id);
           chrome.tabs.sendMessage(currentTab.id, { action: 'requestHint' }, (response) => {
             if (chrome.runtime.lastError) {
               showMessage('Please refresh the LeetCode page and try again.', 'error');
+              console.error('Content script error:', chrome.runtime.lastError);
             } else {
               showMessage('Hint request sent! Check the LeetCode page.', 'success');
-              window.close();
+              // Don't close immediately, let user see the message
+              setTimeout(() => window.close(), 1500);
             }
           });
         } else {
@@ -80,13 +84,17 @@ document.addEventListener('DOMContentLoaded', () => {
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
+        console.log('Solution - Current tab URL:', currentTab?.url);
         if (currentTab && currentTab.url && currentTab.url.includes('leetcode.com/problems/')) {
+          console.log('Sending solution request to tab:', currentTab.id);
           chrome.tabs.sendMessage(currentTab.id, { action: 'requestSolution' }, (response) => {
             if (chrome.runtime.lastError) {
               showMessage('Please refresh the LeetCode page and try again.', 'error');
+              console.error('Content script error:', chrome.runtime.lastError);
             } else {
               showMessage('Solution request sent! Check the LeetCode page.', 'success');
-              window.close();
+              // Don't close immediately, let user see the message
+              setTimeout(() => window.close(), 1500);
             }
           });
         } else {

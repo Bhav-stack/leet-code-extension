@@ -3,11 +3,16 @@
 // Function to detect the LeetCode problem slug from the URL
 function getProblemSlug() {
   const url = window.location.href;
-  if (url.startsWith('https://leetcode.com/problems/')) {
-    const parts = url.split('/');
-    // The problem slug is typically the 4th part: https://leetcode.com/problems/[slug]/
-    return parts[4] || null;
+  debugLog('Checking URL for problem slug:', url);
+  
+  if (url.includes('leetcode.com/problems/')) {
+    const match = url.match(/leetcode\.com\/problems\/([^\/\?]+)/);
+    if (match && match[1]) {
+      debugLog('Problem slug found:', match[1]);
+      return match[1];
+    }
   }
+  debugLog('No problem slug found');
   return null;
 }
 
@@ -18,194 +23,235 @@ function getProblemUrl() {
 
 // Function to get problem title from the page
 function getProblemTitle() {
-  // Try multiple selectors as LeetCode might change their structure
+  debugLog('Attempting to get problem title...');
+  
+  // Wait a bit for the page to load
   const titleSelectors = [
     '[data-cy="question-title"]',
+    'div[data-cy="question-title"]',
     '.text-title-large',
     '.css-v3d350',
+    'h1[class*="title"]',
     'h1',
-    '.question-title'
+    '.question-title',
+    '[class*="question-title"]',
+    '[class*="problem-title"]',
+    'div[class*="title"] h1',
+    'div[class*="title"] span',
+    '.text-lg.font-medium',
+    '.text-xl.font-semibold'
   ];
   
   for (const selector of titleSelectors) {
-    const element = document.querySelector(selector);
-    if (element && element.textContent.trim()) {
-      return element.textContent.trim();
+    try {
+      const elements = document.querySelectorAll(selector);
+      debugLog(`Trying selector "${selector}", found ${elements.length} elements`);
+      
+      for (const element of elements) {
+        const text = element.textContent?.trim();
+        if (text && text.length > 0 && text.length < 200) {
+          // Filter out common non-title texts
+          if (!text.includes('Description') && 
+              !text.includes('Example') && 
+              !text.includes('Constraints') &&
+              !text.includes('Follow up') &&
+              !text.match(/^\d+\.\s*$/)) {
+            debugLog('Problem title found:', text);
+            return text;
+          }
+        }
+      }
+    } catch (e) {
+      debugLog('Error with selector:', selector, e);
     }
   }
-  return 'Unknown Problem';
+  
+  // Fallback: try to extract from URL
+  const slug = getProblemSlug();
+  if (slug) {
+    const titleFromSlug = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    debugLog('Using title from slug:', titleFromSlug);
+    return titleFromSlug;
+  }
+  
+  debugLog('No problem title found, using default');
+  return 'LeetCode Problem';
 }
 
-// Function to create and inject the hint/solution UI
-function createLeetSolveAIUI() {
-  // Check if UI already exists
-  if (document.getElementById('leetsolveai-container')) {
-    return;
+// Function to inject hint/solution directly into LeetCode page
+function injectHintIntoPage(content, type = 'hint') {
+  debugLog('Injecting content into page:', type);
+  
+  // Remove any existing hint/solution
+  const existingHint = document.getElementById('leetsolveai-inline-hint');
+  if (existingHint) {
+    existingHint.remove();
   }
 
-  // Create the main container
-  const container = document.createElement('div');
-  container.id = 'leetsolveai-container';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 320px;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
+  // Find the best location to inject the hint
+  const targetSelectors = [
+    // Try problem description area first
+    '[data-track-load="description_content"]',
+    '.css-1jqueqk',
+    '.question-content',
+    '.content__u3I1',
+    '.question-detail-main-tabs',
+    '.css-12c3ojy',
+    '.css-q9155a',
+    '.description__24sA',
+    // Try broader containers
+    '[class*="question"]',
+    '[class*="problem"]',
+    '[class*="description"]',
+    // Main content areas
+    'main',
+    '.main-content',
+    '#app',
+    '.app'
+  ];
+
+  let targetElement = null;
+  for (const selector of targetSelectors) {
+    const elements = document.querySelectorAll(selector);
+    if (elements.length > 0) {
+      targetElement = elements[0];
+      debugLog('Found target element with selector:', selector);
+      break;
+    }
+  }
+
+  // Fallback: use body
+  if (!targetElement) {
+    targetElement = document.body;
+    debugLog('Using body as fallback target');
+  }
+
+  // Create the hint container
+  const hintContainer = document.createElement('div');
+  hintContainer.id = 'leetsolveai-inline-hint';
+  hintContainer.style.cssText = `
+    background: ${type === 'hint' ? '#FFF3E0' : '#E3F2FD'};
+    border: 2px solid ${type === 'hint' ? '#FF9800' : '#2196F3'};
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 10000;
+    padding: 16px;
+    margin: 16px 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    display: none;
+    font-size: 14px;
+    line-height: 1.6;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 10000;
+    max-width: 100%;
+    word-wrap: break-word;
   `;
 
-  // Create the header
+  // Create header
   const header = document.createElement('div');
   header.style.cssText = `
-    background: #3F51B5;
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px 8px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 12px;
     font-weight: 600;
-    font-size: 14px;
-  `;
-  header.innerHTML = `
-    <span>🧠 LeetSolveAI</span>
-    <button id="leetsolveai-close" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; padding: 0; width: 20px; height: 20px;">&times;</button>
+    color: ${type === 'hint' ? '#E65100' : '#1565C0'};
   `;
 
-  // Create the content area
-  const content = document.createElement('div');
-  content.id = 'leetsolveai-content';
-  content.style.cssText = `
-    padding: 16px;
-    max-height: 400px;
-    overflow-y: auto;
-  `;
+  const title = document.createElement('span');
+  title.textContent = type === 'hint' ? '💡 AI Hint' : '🔧 AI Solution';
+  title.style.fontSize = '16px';
 
-  // Create action buttons
-  const actions = document.createElement('div');
-  actions.style.cssText = `
-    padding: 12px 16px;
-    border-top: 1px solid #e0e0e0;
+  const closeButton = document.createElement('button');
+  closeButton.innerHTML = '×';
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: ${type === 'hint' ? '#E65100' : '#1565C0'};
+    padding: 0;
+    width: 24px;
+    height: 24px;
     display: flex;
-    gap: 8px;
+    align-items: center;
+    justify-content: center;
   `;
+  closeButton.onclick = () => hintContainer.remove();
 
-  const hintButton = document.createElement('button');
-  hintButton.id = 'leetsolveai-hint-btn';
-  hintButton.textContent = 'Get Hint';
-  hintButton.style.cssText = `
-    flex: 1;
-    background: #FF9800;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 13px;
-    transition: background-color 0.2s;
+  header.appendChild(title);
+  header.appendChild(closeButton);
+
+  // Create content area
+  const contentArea = document.createElement('div');
+  contentArea.style.cssText = `
+    color: #333;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
   `;
-  hintButton.onmouseover = () => hintButton.style.background = '#F57C00';
-  hintButton.onmouseout = () => hintButton.style.background = '#FF9800';
-
-  const solutionButton = document.createElement('button');
-  solutionButton.id = 'leetsolveai-solution-btn';
-  solutionButton.textContent = 'Get Solution';
-  solutionButton.style.cssText = `
-    flex: 1;
-    background: #3F51B5;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 13px;
-    transition: background-color 0.2s;
-  `;
-  solutionButton.onmouseover = () => solutionButton.style.background = '#303F9F';
-  solutionButton.onmouseout = () => solutionButton.style.background = '#3F51B5';
-
-  actions.appendChild(hintButton);
-  actions.appendChild(solutionButton);
-
-  container.appendChild(header);
-  container.appendChild(content);
-  container.appendChild(actions);
-
-  // Add event listeners
-  document.getElementById = (id) => container.querySelector(`#${id}`) || document.querySelector(`#${id}`);
   
-  header.querySelector('#leetsolveai-close').addEventListener('click', () => {
-    container.style.display = 'none';
-  });
+  // Format the content nicely
+  const formattedContent = content
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+    .replace(/```([\s\S]*?)```/g, '<pre style="background: #f5f5f5; padding: 8px; border-radius: 4px; margin: 8px 0; overflow-x: auto;"><code>$1</code></pre>') // Code blocks
+    .replace(/`(.*?)`/g, '<code style="background: #f5f5f5; padding: 2px 4px; border-radius: 3px;">$1</code>') // Inline code
+    .replace(/•/g, '•'); // Ensure bullet points display correctly
 
-  hintButton.addEventListener('click', () => {
-    requestHint();
-  });
+  contentArea.innerHTML = formattedContent;
 
-  solutionButton.addEventListener('click', () => {
-    requestSolution();
-  });
+  hintContainer.appendChild(header);
+  hintContainer.appendChild(contentArea);
 
-  // Append to body
-  document.body.appendChild(container);
-
-  return container;
-}
-
-// Function to show the UI
-function showLeetSolveAIUI() {
-  const container = document.getElementById('leetsolveai-container');
-  if (container) {
-    container.style.display = 'block';
+  // Insert the hint
+  if (targetElement === document.body) {
+    // If using body, position it fixed at the top
+    hintContainer.style.position = 'fixed';
+    hintContainer.style.top = '20px';
+    hintContainer.style.left = '20px';
+    hintContainer.style.right = '20px';
+    hintContainer.style.zIndex = '10000';
+    targetElement.appendChild(hintContainer);
+  } else {
+    // Try to insert at the beginning, but handle errors gracefully
+    try {
+      if (targetElement.firstChild) {
+        targetElement.insertBefore(hintContainer, targetElement.firstChild);
+      } else {
+        targetElement.appendChild(hintContainer);
+      }
+    } catch (e) {
+      debugLog('Error inserting into target, using body:', e);
+      document.body.appendChild(hintContainer);
+      hintContainer.style.position = 'fixed';
+      hintContainer.style.top = '20px';
+      hintContainer.style.left = '20px';
+      hintContainer.style.right = '20px';
+      hintContainer.style.zIndex = '10000';
+    }
   }
+
+  // Scroll to the hint
+  setTimeout(() => {
+    hintContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  debugLog('Content injected successfully');
+  return hintContainer;
 }
 
-// Function to update the content
-function updateUIContent(content, type = 'info') {
-  const contentDiv = document.getElementById('leetsolveai-content');
-  if (contentDiv) {
-    const typeColors = {
-      info: '#2196F3',
-      success: '#4CAF50',
-      warning: '#FF9800',
-      error: '#F44336'
-    };
-
-    contentDiv.innerHTML = `
+// Function to show loading state inline
+function showInlineLoading(type = 'hint') {
+  const loadingMessage = type === 'hint' ? 'Generating hint...' : 'Generating solution...';
+  
+  const loadingContent = `
+    <div style="display: flex; align-items: center; gap: 12px; color: #666;">
       <div style="
-        padding: 12px;
-        background: ${typeColors[type]}15;
-        border-left: 4px solid ${typeColors[type]};
-        border-radius: 4px;
-        font-size: 14px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-      ">${content}</div>
-    `;
-  }
-}
-
-// Function to show loading state
-function showLoading(message = 'Loading...') {
-  updateUIContent(`
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <div style="
-        width: 16px;
-        height: 16px;
-        border: 2px solid #3F51B5;
-        border-top: 2px solid transparent;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top: 2px solid #FF9800;
         border-radius: 50%;
         animation: spin 1s linear infinite;
       "></div>
-      ${message}
+      <span>${loadingMessage}</span>
     </div>
     <style>
       @keyframes spin {
@@ -213,58 +259,65 @@ function showLoading(message = 'Loading...') {
         100% { transform: rotate(360deg); }
       }
     </style>
-  `, 'info');
+  `;
+  
+  injectHintIntoPage(loadingContent, type);
 }
 
-// Function to request hint
+// Updated function to request hint
 function requestHint() {
+  debugLog('Hint requested');
   const problemSlug = getProblemSlug();
+  const problemTitle = getProblemTitle();
+  
+  debugLog('Problem details:', { slug: problemSlug, title: problemTitle });
+  
   if (!problemSlug) {
-    updateUIContent('Unable to detect LeetCode problem. Please make sure you are on a problem page.', 'error');
-    showLeetSolveAIUI();
+    injectHintIntoPage('❌ Unable to detect LeetCode problem. Please make sure you are on a problem page.\n\nCurrent URL: ' + window.location.href, 'hint');
     return;
   }
 
-  showLoading('Generating hint...');
-  showLeetSolveAIUI();
+  showInlineLoading('hint');
 
   chrome.runtime.sendMessage({
     action: 'getHint',
     problemSlug: problemSlug,
-    problemTitle: getProblemTitle()
+    problemTitle: problemTitle
   });
 }
 
-// Function to request solution
+// Updated function to request solution
 function requestSolution() {
+  debugLog('Solution requested');
   const problemSlug = getProblemSlug();
+  const problemTitle = getProblemTitle();
+  
+  debugLog('Problem details:', { slug: problemSlug, title: problemTitle });
+  
   if (!problemSlug) {
-    updateUIContent('Unable to detect LeetCode problem. Please make sure you are on a problem page.', 'error');
-    showLeetSolveAIUI();
+    injectHintIntoPage('❌ Unable to detect LeetCode problem. Please make sure you are on a problem page.\n\nCurrent URL: ' + window.location.href, 'solution');
     return;
   }
 
-  showLoading('Generating solution...');
-  showLeetSolveAIUI();
+  showInlineLoading('solution');
 
   chrome.runtime.sendMessage({
     action: 'getSolution',
     problemSlug: problemSlug,
-    problemTitle: getProblemTitle()
+    problemTitle: problemTitle
   });
 }
 
 // Listen for messages from background script and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  debugLog('Received message:', request.action);
+  
   if (request.action === 'displayHint') {
-    updateUIContent(request.hint, 'success');
-    showLeetSolveAIUI();
+    injectHintIntoPage(request.hint, 'hint');
   } else if (request.action === 'displaySolution') {
-    updateUIContent(request.solution, 'success');
-    showLeetSolveAIUI();
+    injectHintIntoPage(request.solution, 'solution');
   } else if (request.action === 'displayError') {
-    updateUIContent(request.error, 'error');
-    showLeetSolveAIUI();
+    injectHintIntoPage(`❌ Error: ${request.error}`, 'hint');
   } else if (request.action === 'requestHint') {
     requestHint();
   } else if (request.action === 'requestSolution') {
@@ -283,36 +336,30 @@ function initialize() {
   debugLog('Initializing LeetSolveAI...');
   debugLog('Current URL:', window.location.href);
   
-  const problemSlug = getProblemSlug();
-  debugLog('Problem slug detected:', problemSlug);
-  
-  // Check if we're on a LeetCode problem page
-  if (problemSlug) {
-    debugLog('Creating UI for problem:', problemSlug);
-    createLeetSolveAIUI();
+  // Wait a bit for the page to fully load
+  setTimeout(() => {
+    const problemSlug = getProblemSlug();
+    const problemTitle = getProblemTitle();
     
-    // Show the UI immediately with welcome message
-    updateUIContent(`🎯 Problem detected: "${getProblemTitle()}"\n\nClick "Get Hint" for guidance or "Get Solution" for the complete answer.`, 'info');
-    showLeetSolveAIUI();
-    debugLog('UI should now be visible');
+    debugLog('Problem detection results:', { slug: problemSlug, title: problemTitle });
     
-    // Notify background script about problem detection
-    chrome.runtime.sendMessage({
-      action: 'problemDetected',
-      slug: problemSlug,
-      title: getProblemTitle(),
-      url: getProblemUrl()
-    }, (response) => {
-      debugLog('Background script response:', response);
-    });
-  } else {
-    debugLog('Not on a LeetCode problem page');
-    // Hide UI if it exists
-    const container = document.getElementById('leetsolveai-container');
-    if (container) {
-      container.style.display = 'none';
+    // Check if we're on a LeetCode problem page
+    if (problemSlug) {
+      debugLog('LeetCode problem detected');
+      
+      // Notify background script about problem detection
+      chrome.runtime.sendMessage({
+        action: 'problemDetected',
+        slug: problemSlug,
+        title: problemTitle,
+        url: getProblemUrl()
+      }, (response) => {
+        debugLog('Background script response:', response);
+      });
+    } else {
+      debugLog('Not on a LeetCode problem page');
     }
-  }
+  }, 2000); // Wait 2 seconds for page to load
 }
 
 // Wait for page to be fully loaded
@@ -332,7 +379,7 @@ const observer = new MutationObserver(() => {
     currentUrl = window.location.href;
     debugLog('URL changed to:', currentUrl);
     // Small delay to let the page content load
-    setTimeout(initialize, 2000);
+    setTimeout(initialize, 3000);
   }
 });
 
@@ -360,7 +407,12 @@ window.addEventListener('popstate', () => {
 // Add a manual trigger for testing
 window.leetSolveAITest = () => {
   debugLog('Manual test triggered');
-  initialize();
+  const problemSlug = getProblemSlug();
+  const problemTitle = getProblemTitle();
+  debugLog('Test results:', { slug: problemSlug, title: problemTitle });
+  
+  // Test injection
+  injectHintIntoPage(`🧪 Test injection successful!\n\nProblem: ${problemTitle}\nSlug: ${problemSlug}\nURL: ${window.location.href}`, 'hint');
 };
 
 debugLog('Content script loaded');
